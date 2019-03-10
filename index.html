@@ -1,0 +1,950 @@
+<html>
+    <head>
+        <title>Peterburg Analytica</title>
+        <script
+        src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
+        <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/jcanvas/21.0.0/min/jcanvas.min.js"
+        crossorigin="anonymous"></script>
+        <script
+        src="https://code.jquery.com/ui/1.12.0/jquery-ui.min.js"
+        crossorigin="anonymous"></script>
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+        <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        
+
+        <style>
+            html, body {
+                padding: 0px;
+                margin: 0px;
+                font-family: Verdana, Geneva, Tahoma, sans-serif;
+            }
+
+            #header {
+                width:100%; 
+                background-image:url(pa-small.png); 
+                background-color: #a60a44; 
+                height: 80px; 
+                background-repeat: no-repeat;
+            }
+
+            #header span {
+                position: absolute;
+                right: 10px;
+                top: 10px;
+
+                font-size: 0.5em;
+                color: white;
+                padding: 5px;
+
+            }
+
+            #page {
+                padding: 10px;
+            }
+
+            #controls {
+                padding: 0px;
+                background: #630628;
+            }
+
+            #params, #params-stats, #params-user, #params-global {
+                display: inline-block;
+                margin: 15px;
+                color: white;
+            }
+
+            #menu {
+                display: inline-block;
+                padding: 0px;
+                padding-left: 15px;
+            }
+
+            .nameplate {
+                font-weight: 600;
+                font-size: 1.4em;
+                color: #222;
+                padding: 5px;
+            }
+
+            .userid {
+                font-size: 0.5em;
+                color: #999;
+            }
+
+            #menu a, #menu a:visited {
+                
+                padding: 8px;
+                margin: 0px;               
+                text-decoration: none;
+                color: white;
+            }
+
+            #menu a:hover {
+                background: #bb0045;
+            }
+
+            a.selected {
+                background: #a60a44;
+            }
+
+            span.badge {
+                background: black;
+                padding: 4px;
+                border-radius: 2px;
+                color: white;
+                font-size: 0.6em;
+            }
+
+            #profile-toolbar {
+                color: black;
+                font-size: 1em;
+                padding: 5px;
+            }
+
+            #profile-toolbar a, #profile-toolbar a:visited {
+                color: #630628;
+                text-decoration: none;
+            }
+
+            #profile-toolbar a:hover {
+                color: #a60a44;
+            }
+        </style>
+    </head>
+
+<body>
+    <div id="header"><span>v. 1.1.0</span></div>
+    <div id="controls">
+        <div id="menu">
+            <a href="#" onclick="selectTab(1)">Overview</a>
+            <a href="#" onclick="selectTab(2)">Summary</a>
+            <a href="#" onclick="selectTab(3)">User</a>          
+        </div>
+        
+        <div id="params">
+            <input type="text" id="datepicker-overall" size="6">
+            <button onclick="show()">Show</button>   
+    
+        
+    
+        </div>
+
+        <div id="params-stats">Platform:
+            <select id="stats-platform-policy" onchange="showSummary()">
+                <option value="0">EQUAL</option>
+                <option value="1">PC</option>
+                <option value="2">MOBILE</option>
+                <option value="3">PC > MOBILE</option>
+                <option value="4">MOBILE > PC</option>
+            </select>
+        </div>
+
+        <div id="params-user">
+            User:
+            <select id="user-select" onchange="">
+                <option value="0">...</option>
+            </select>
+
+            From: 
+            <input type="text" id="datepicker-user-from" size="6">
+            To:
+            <input type="text" id="datepicker-user-to" size="6">
+            
+            Platform:
+            <select id="user-platform-policy">
+                <option value="0">EQUAL</option>
+                <option value="1">PC</option>
+                <option value="2">MOBILE</option>
+                <option value="3">PC > MOBILE</option>
+                <option value="4">MOBILE > PC</option>
+            </select>
+
+            <button onclick="showUser()">Get</button> 
+        </div>
+
+        <div id="params-global">
+            Compensate: <input type="checkbox" id="global-compensate"/>           
+        </div>
+
+        
+    </div>
+    <div id="page">     
+        <div id="content">
+            
+        </div>
+
+        <div id="content-stats">
+            
+        </div>
+
+        <div id="content-user">
+            
+        </div>
+    </div>
+
+    
+    
+    <script>
+		var serverURL = "http://80.87.194.113:8080"
+		
+        var user_data = []
+        var colors = {
+            no_data: '#eee',
+            offline: '#ccc',
+            online: '#630628',
+            mobile: '#bb0045'
+        }
+    
+        function show() {
+            let date = $('#datepicker-overall').datepicker( "getDate" )
+            getData(date.getDate(), date.getMonth())
+        }
+
+        function isCompensate() {
+            return $('#global-compensate').prop('checked')
+        }
+
+        function showSummary() {
+            $('#content-stats').empty()
+            $('#content-stats').append(getSumProfile($('#stats-platform-policy').val()))
+        }
+
+        function showUser() {
+            let userid = $(`#user-select`).val()
+            let day_from = day_of_year($('#datepicker-user-from').datepicker( "getDate" ))
+            let day_to = day_of_year($('#datepicker-user-to').datepicker( "getDate" ))
+
+            getUserData(userid, day_from, day_to)
+            //console.log(`user: ${userid}; ${day_from}-${day_to}; ${platform_policy}`)
+        }
+
+        function dateFromDay(day){
+            var date = new Date(new Date().getFullYear(), 0);
+            return new Date(date.setDate(day));
+        }
+
+        function drawUserData(days) {
+            let userid = $(`#user-select`).val()
+            let day_from = day_of_year($('#datepicker-user-from').datepicker( "getDate" ))
+            let day_to = day_of_year($('#datepicker-user-to').datepicker( "getDate" ))
+            let platform_policy = parseInt($(`#user-platform-policy`).val())
+
+            let canvas_left_padding = 30
+            
+            let user = {}
+            for(u of user_data) {
+                if(userid == u.id)
+                    user = u
+            }
+
+            let profile_element = $(`<p></p>`)
+            
+            var $myCanvas = $(`<canvas id="user-${user.id}" width="900" height="${31*days.length+55+240}"></canvas>`);
+            // Fill background
+            $myCanvas.drawRect({
+                fillStyle: '#eee',
+                x: 0, y: 0,
+                fromCenter: false,
+                width: $myCanvas.attr('width'),
+                height: $myCanvas.attr('height')
+            });
+
+            // ===================================
+            let rows = []
+
+            for(let day of days) {
+                rows.push(unpackRegions(day))
+            }
+
+            let results = []
+            for(let i = 0; i < 720; i++) {
+                let col = []
+                for(let row of rows) {
+                    col.push(row[i])
+                }
+                results[i] = sumFunctions[platform_policy](col)
+            }
+
+    
+            let results_min = Array.min(results)
+            let results_max = Array.max(results)
+
+            for(let i = 0; i < 720; i++) {
+                let c = Math.floor((results[i]-results_min)/results_max*255)
+                let color = `rgb(${255-Math.floor(c*0.3)},${255-c},${255-Math.floor(c*0.9)})`
+                $myCanvas.drawRect({
+                    fillStyle: color,
+                    x: i+canvas_left_padding, y: 215,
+                    fromCenter: false,
+                    width: 1,
+                    height: 30
+                });
+            }
+
+            $myCanvas.drawRect({
+                fillStyle: 'black',
+                x: canvas_left_padding, y: 245,
+                fromCenter: false,
+                width: 720,
+                height: 3
+            })
+
+            // ================================
+
+            let row_height = 248
+            let day_count = 0
+            let all_online_pc = 0
+            let all_online_mobile = 0
+            for(let day of days) {              
+                let current_pos = 0
+                let online_pc = 0
+                let online_mobile = 0
+                for(var region of day) {
+                    let color = 'black'
+                    switch(region.val) {
+                        case -1: color = colors.offline; break // masking NO_DATA to OFFLINE color
+                        case 0: color = colors.offline; break
+                        case 1: color = colors.online; break
+                        case 2: color = colors.mobile; break
+                    }
+    
+                    let region_width = region.count
+                    if(region.val === 1) online_pc += region.count
+                    if(region.val === 2) online_mobile += region.count
+        
+                    $myCanvas.drawRect({
+                        fillStyle: color,
+                        x: canvas_left_padding+current_pos, y: row_height,
+                        fromCenter: false,
+                        width: region_width,
+                        height: 30
+                    });
+        
+                    current_pos += region_width
+                }
+
+                $myCanvas.drawRect({
+                    fillStyle: 'black',
+                    x: canvas_left_padding, y: row_height+30,
+                    fromCenter: false,
+                    width: 720,
+                    height: 1
+                })
+
+                let cur_date = dateFromDay(day_from+day_count)
+                var weekday = new Array(7);
+                weekday[0] = "Sunday";
+                weekday[1] = "Monday";
+                weekday[2] = "Tuesday";
+                weekday[3] = "Wednesday";
+                weekday[4] = "Thursday";
+                weekday[5] = "Friday";
+                weekday[6] = "Saturday";
+
+                let wd = weekday[cur_date.getDay()];
+
+                $myCanvas.drawText({
+                    fillStyle: 'black',
+                    fontStyle: 'bold',
+                    x: 730+canvas_left_padding, y: row_height+4,
+                    fontSize: 10,
+                    fromCenter: false,
+                    fontFamily: 'Verdana, sans-serif',
+                    text: `${wd} (${cur_date.getDate()}.${cur_date.getMonth()})`
+                })
+
+                let time_spent = `${precisionRound( (online_pc)/30 , 1)}/${precisionRound( (online_pc+online_mobile)/30 , 1)} hrs`
+                $myCanvas.drawText({
+                    fillStyle: 'black',
+                    x: 730+canvas_left_padding, y: row_height+15,
+                    fontSize: 10,
+                    fromCenter: false,
+                    fontFamily: 'Verdana, sans-serif',
+                    text: time_spent
+                })
+
+                all_online_pc += precisionRound( (online_pc)/30 , 1)
+                all_online_mobile += precisionRound( (online_mobile)/30 , 1)
+                row_height += 31
+                day_count++
+            }
+
+            let avg_online_pc = precisionRound( all_online_pc/day_count , 1)
+            let avg_online_moblie = precisionRound( all_online_mobile/day_count , 1)
+            let avg_offline = avg_online_pc+avg_online_moblie > 24 ? 0 : 24 - (avg_online_pc+avg_online_moblie)
+
+            for(i = 1; i < 24; i++) {   
+                $myCanvas.drawRect({
+                    fillStyle: 'black',
+                    x: 30*i+canvas_left_padding, y: row_height,
+                    fromCenter: false,
+                    width: 1,
+                    height: 4
+                })
+
+                $myCanvas.drawText({
+                    fillStyle: 'black',
+                    x: 30*i + 1+canvas_left_padding, y: row_height+10,
+                    fontSize: 10,
+                    fromCenter: true,
+                    fontFamily: 'Verdana, sans-serif',
+                    text: i
+                })
+            }
+
+            // ********************
+
+            $myCanvas.drawRect({
+                fillStyle: '#a60a44',
+                x: 0, y: 0,
+                fromCenter: false,
+                width: $myCanvas.attr('width'),
+                height: 60
+            })
+            $myCanvas.drawImage({
+                source: 'pa-small.png',
+                x: 0, y: 0,
+                width: 160,
+                height: 60,
+                fromCenter: false
+            })
+            $myCanvas.drawRect({
+                fillStyle: '#630628',
+                x: 0, y: 60,
+                fromCenter: false,
+                width: $myCanvas.attr('width'),
+                height: 44
+            })
+
+            $myCanvas.drawText({
+                fillStyle: 'white',
+                x: 20, y: 66,
+                fontSize: 28,
+                fontStyle: 'bold',
+                fromCenter: false,
+                fontFamily: 'Verdana, sans-serif',
+                text: `${user.first_name} ${user.last_name}`
+            })
+            $myCanvas.drawText({
+                fillStyle: '#ccc',
+                x: $myCanvas.attr('width')-60, y: 82,
+                maxWidth: 200,
+                fontSize: 8,
+                align: 'right',
+                fontFamily: 'Verdana, sans-serif',
+                text: `ID: ${user.id}\nPlatform: ${$(`#user-platform-policy option:nth-child(${platform_policy+1})`).text()}`
+            })
+
+            // ***************
+
+            let chart_width = 840
+            let chart_height = 20
+
+            let chart_pc_width = Math.floor(avg_online_pc*chart_width/24)
+            let chart_mobile_width = Math.floor(avg_online_moblie*chart_width/24)
+            let chart_offline_width = chart_width - (chart_pc_width + chart_mobile_width)
+
+            $myCanvas.drawRect({
+                fillStyle: '#ddd',
+                fromCenter: false,
+                x: canvas_left_padding, y: 120,
+                width: chart_pc_width+chart_mobile_width,
+                height: chart_height*2
+            })
+            $myCanvas.drawText({
+                fillStyle: 'black',
+                x: canvas_left_padding+( (chart_pc_width+chart_mobile_width)/2 ), y: 120 + chart_height + chart_height/2,
+                fontSize: 10,
+                fromCenter: true,
+                fontFamily: 'Verdana, sans-serif',
+                text: `${avg_online_pc+avg_online_moblie}h`
+            })
+
+            $myCanvas.drawRect({
+                fillStyle: colors.online,
+                x: canvas_left_padding, y: 120,
+                fromCenter: false,
+                width: chart_pc_width,
+                height: chart_height
+            })
+            $myCanvas.drawText({
+                fillStyle: 'white',
+                x: canvas_left_padding+( (chart_pc_width)/2 ), y: 120 + chart_height/2,
+                fontSize: 10,
+                fromCenter: true,
+                fontFamily: 'Verdana, sans-serif',
+                text: `${avg_online_pc}h`
+            })
+
+            $myCanvas.drawRect({
+                fillStyle: colors.mobile,
+                x: canvas_left_padding+chart_pc_width, y: 120,
+                fromCenter: false,
+                width: chart_mobile_width,
+                height: chart_height
+            })
+            $myCanvas.drawText({
+                fillStyle: 'white',
+                x: canvas_left_padding+chart_pc_width+( (chart_mobile_width)/2 ), y: 120 + chart_height/2,
+                fontSize: 10,
+                fromCenter: true,
+                fontFamily: 'Verdana, sans-serif',
+                text: `${avg_online_moblie}h`
+            })
+
+            $myCanvas.drawRect({
+                fillStyle: colors.offline,
+                x: canvas_left_padding+chart_pc_width+chart_mobile_width, y: 120,
+                fromCenter: false,
+                width: chart_offline_width,
+                height: chart_height
+            })
+            $myCanvas.drawText({
+                fillStyle: 'black',
+                x: canvas_left_padding+chart_pc_width+chart_mobile_width+( (chart_offline_width)/2 ), y: 120 + chart_height/2,
+                fontSize: 10,
+                fromCenter: true,
+                fontFamily: 'Verdana, sans-serif',
+                text: `${avg_offline}h`
+            })
+            
+            // ***************
+
+            $myCanvas.drawRect({
+                fillStyle: colors.online,
+                x: canvas_left_padding, y: 160 + chart_height,
+                fromCenter: false,
+                width: 14,
+                height: 14
+            })
+            $myCanvas.drawText({
+                fillStyle: 'black',
+                x: canvas_left_padding+16, y: 160 + chart_height,
+                fontSize: 14,
+                fromCenter: false,
+                fontFamily: 'Verdana, sans-serif',
+                text: `PC`
+            })
+
+            $myCanvas.drawRect({
+                fillStyle: colors.mobile,
+                x: canvas_left_padding + 45, y: 160 + chart_height,
+                fromCenter: false,
+                width: 14,
+                height: 14
+            })
+            $myCanvas.drawText({
+                fillStyle: 'black',
+                x: canvas_left_padding+61, y: 160 + chart_height,
+                fontSize: 14,
+                fromCenter: false,
+                fontFamily: 'Verdana, sans-serif',
+                text: `MOBILE`
+            })
+
+            $myCanvas.drawRect({
+                fillStyle: colors.offline,
+                x: canvas_left_padding + 130, y: 160 + chart_height,
+                fromCenter: false,
+                width: 14,
+                height: 14
+            })
+            $myCanvas.drawText({
+                fillStyle: 'black',
+                x: canvas_left_padding+146, y: 160 + chart_height,
+                fontSize: 14,
+                fromCenter: false,
+                fontFamily: 'Verdana, sans-serif',
+                text: `OFFLINE`
+            })
+
+            // ***************
+
+            let profile_header = $(`<div class="nameplate">${user.first_name} ${user.last_name} 
+            <span class="userid">ID: ${user.id}, 
+            Platform: ${$(`#user-platform-policy option:nth-child(${platform_policy+1})`).text()}</span>
+            </div>
+            <div style="padding: 5px; margin: 3px; margin-top: 0px; padding-top: 2px; color: #999">Average 
+            <span class="badge" style="background:black">total: ${avg_online_pc+avg_online_moblie} hrs</span>
+            <span class="badge" style="background:${colors.online}">PC: ${avg_online_pc} hrs</span>
+            <span class="badge" style="background:${colors.mobile}">mobile: ${avg_online_moblie} hrs</span>
+            <span class="badge" style="background:${colors.offline}; color: black">offline: ${avg_offline} hrs</span>
+            </div>
+            `)
+
+            let profile_toolbar = $(`<div id="profile-toolbar">
+            <a href='https://vk.com/id${user.id}'>VK profile</a>
+            </div><img id="canvasImg" alt="Right click to save me!" crossOrigin="Anonymous">
+            `)
+
+            //profile_element.append(profile_header)
+            profile_element.append(profile_toolbar)
+            //profile_element.append($myCanvas)
+            
+
+            $('#content-user').empty()
+            $('#content-user').append(profile_element)
+
+            // save canvas image as data url (png format by default)
+            var dataURL = $myCanvas.getCanvasImage('png');
+
+            // set canvasImg image src to dataURL
+            // so it can be saved as an image
+            document.getElementById('canvasImg').src = dataURL;
+        }
+
+        function downloadUserProfile(id) {
+            
+        }
+
+        function day_of_year(date) {
+            var start = new Date(date.getFullYear(), 0, 0);
+            var diff = date - start;
+            var oneDay = 1000 * 60 * 60 * 24;
+            var day = Math.floor(diff / oneDay);
+
+            return day
+        }
+
+        function selectTab(tab) {
+            if(tab == 1) {
+                $('#params').show()
+                $('#content').show()
+
+
+                $('#params-stats').hide()
+                $('#content-stats').hide()
+
+                $('#params-user').hide()
+                $('#content-user').hide()
+            } else if(tab == 2) {
+                $('#params').show()
+                $('#content').hide()
+
+                $('#params-stats').show()
+                $('#content-stats').show()
+
+                $('#params-user').hide()
+                $('#content-user').hide()
+            } else if(tab == 3) {
+                $('#params').hide()
+                $('#content').hide()
+
+                $('#params-stats').hide()
+                $('#content-stats').hide()
+
+                $('#params-user').show()
+                $('#content-user').show()
+            }
+
+            
+            $('#menu a').removeClass('selected')
+            $(`#menu a:nth-child(${tab})`).addClass('selected')
+            
+            
+        }
+    
+        function getData(day, month) {
+            console.log(`get data> day ${day}, month ${month}`)
+            var xhr = new XMLHttpRequest()
+            xhr.open('GET', `http://80.87.194.113:8080/?day=${day}&month=${month}&c=${isCompensate()}`, false)
+            xhr.send()
+            if (xhr.status != 200) {
+                alert( xhr.status + ': ' + xhr.statusText )
+                return undefined
+            } else {
+                user_data = JSON.parse(xhr.responseText)
+                console.log(`recieved data`)
+    
+                if(user_data.error === undefined) {
+                    drawProfiles()
+                    showSummary()
+                    update_user_list()
+                    
+                }
+                    
+                else 
+                    alert('Error: ' + user_data.error)
+    
+                return xhr.responseText
+            }
+
+        }
+
+        function getUserData(user, from, to) {
+            var xhr = new XMLHttpRequest()
+            xhr.open('GET', `${serverURL}/?user=${user}&from=${from}&to=${to}&c=${isCompensate()}`, false)
+            xhr.send()
+            if (xhr.status != 200) {
+                alert( xhr.status + ': ' + xhr.statusText )
+                return undefined
+            } else {
+                u = JSON.parse(xhr.responseText)
+                console.log(`recieved user data`)
+    
+                if(u.error === undefined) {
+                    drawUserData(u)   
+                }
+                    
+                else 
+                    alert('Error: ' + u.error)
+    
+                return xhr.responseText
+            }
+
+        }
+
+        function update_user_list() {
+            $('#user-select').empty()
+            for(let user of user_data) {    
+                $('#user-select').append(`<option value="${user.id}">${user.first_name} ${user.last_name}</option>`)
+            }
+        }
+    
+        function drawProfiles() {
+            $('#content').empty()
+            for(let user of user_data) {
+                $('#content').append(getUserProfile(user))
+            }
+        }
+    
+        function getUserProfile(user) {
+            let profile_element = $(`<p></p>`)
+            let profile_header = $(`<div class="nameplate">${user.first_name} ${user.last_name} <span class="userid">${user.id}</span></div>`)
+    
+            var $myCanvas = $(`<canvas id="profile-${user.id}" width="800" height="45"></canvas>`);
+    
+            let current_pos = 0
+            let online_pc = 0
+            let online_mobile = 0
+            for(var region of user.samples) {
+                let color = 'black'
+                switch(region.val) {
+                    case -1: color = colors.no_data; break
+                    case 0: color = colors.offline; break
+                    case 1: color = colors.online; break
+                    case 2: color = colors.mobile; break
+                }
+    
+                let region_width = region.count
+                if(region.val === 1) online_pc += region.count
+                if(region.val === 2) online_mobile += region.count
+    
+                $myCanvas.drawRect({
+                    fillStyle: color,
+                    x: current_pos, y: 0,
+                    fromCenter: false,
+                    width: region_width,
+                    height: 30
+                });
+    
+                current_pos += region_width
+            }
+
+
+            let time_spent = `${precisionRound( (online_pc)/30 , 1)}/${precisionRound( (online_pc+online_mobile)/30 , 1)} hrs`
+            $myCanvas.drawText({
+                fillStyle: 'black',
+                x: 730, y: 10,
+                fontSize: 10,
+                fromCenter: false,
+                fontFamily: 'Verdana, sans-serif',
+                text: time_spent
+            })
+
+            $myCanvas.drawRect({
+                fillStyle: 'black',
+                x: 0, y: 30,
+                fromCenter: false,
+                width: 720,
+                height: 1
+            })
+
+            for(i = 1; i < 24; i++) {   
+                $myCanvas.drawRect({
+                    fillStyle: 'black',
+                    x: 30*i, y: 31,
+                    fromCenter: false,
+                    width: 1,
+                    height: 4
+                })
+
+                $myCanvas.drawText({
+                    fillStyle: 'black',
+                    x: 30*i + 1, y: 41,
+                    fontSize: 10,
+                    fromCenter: true,
+                    fontFamily: 'Verdana, sans-serif',
+                    text: i
+                })
+            }
+    
+            profile_element.append(profile_header)
+            profile_element.append($myCanvas)
+    
+            return profile_element
+        }
+
+        var sumFunctions = []
+        sumFunctions[0] = function(row) { // EQUAL
+            let sum = 0
+            for(let val of row)
+                if(val > 0)
+                    sum++
+            return sum
+        }
+        sumFunctions[1] = function(row) { // PC
+            let sum = 0
+            for(let val of row)
+                if(val === 1)
+                    sum++
+            return sum
+        }
+        sumFunctions[2] = function(row) { // MOBILE
+            let sum = 0
+            for(let val of row)
+                if(val === 2)
+                    sum++
+            return sum
+        }
+        sumFunctions[3] = function(row) { // PC > MOBILE
+            let sum = 0
+            for(let val of row) {
+                if(val > 0) {
+                    val = val == 1 ? 2 : 1
+                    sum += val 
+                }                              
+            }               
+            return sum
+        }
+        sumFunctions[4] = function(row) { // MOBILE > PC
+            let sum = 0
+            for(let val of row)
+                if(val > 0) {
+                        sum += val 
+                } 
+            return sum
+        }
+
+        function unpackRegions(samples) {
+            let row = []
+            let index = 0
+            for(let region of samples) {
+                for(let j = index; j < index + region.count; j++) {
+                    row[j] = region.val
+                }
+                index += region.count
+            }
+
+            return row
+        }
+
+        function precisionRound(number, precision) {
+            var factor = Math.pow(10, precision);
+            return Math.round(number * factor) / factor;
+        }
+
+        Array.max = function( array ){
+                return Math.max.apply( Math, array );
+        };
+
+        Array.min = function( array ){
+            return Math.min.apply( Math, array );
+        };
+
+        function getSumProfile(platform_policy) {
+            let profile_element = $(`<p></p>`)
+    
+            var $myCanvas = $(`<canvas id="summary-${platform_policy}" width="720" height="45"></canvas>`);
+
+            let rows = []
+
+            for(let user of user_data) {
+                let regions = unpackRegions(user.samples)
+                rows.push(regions)
+            }
+
+            let results = []
+            for(let i = 0; i < 720; i++) {
+                let col = []
+                for(let row of rows) {
+                    col.push(row[i])
+                }
+                results[i] = sumFunctions[platform_policy](col)
+            }
+
+    
+            let results_min = Array.min(results)
+            let results_max = Array.max(results)
+
+            for(let i = 0; i < 720; i++) {
+                let c = Math.floor((results[i]-results_min)/results_max*255)
+                let color = `rgb(${255-Math.floor(c*0.3)},${255-c},${255-Math.floor(c*0.9)})`
+                $myCanvas.drawRect({
+                    fillStyle: color,
+                    x: i, y: 0,
+                    fromCenter: false,
+                    width: 1,
+                    height: 30
+                });
+            }
+
+            $myCanvas.drawRect({
+                fillStyle: 'black',
+                x: 0, y: 30,
+                fromCenter: false,
+                width: 720,
+                height: 1
+            })
+
+            for(i = 1; i < 24; i++) {   
+                $myCanvas.drawRect({
+                    fillStyle: 'black',
+                    x: 30*i, y: 31,
+                    fromCenter: false,
+                    width: 1,
+                    height: 4
+                })
+
+                $myCanvas.drawText({
+                    fillStyle: 'black',
+                    x: 30*i + 1, y: 41,
+                    fontSize: 10,
+                    fromCenter: true,
+                    fontFamily: 'Verdana, sans-serif',
+                    text: i
+                })
+            }
+
+            let profile_header = $(`
+            <div class="nameplate">Summary
+            <span class="userid">Platform: ${$(`#stats-platform-policy option:nth-child(${platform_policy+1})`).text()}</span>
+            </div>
+            `)
+    
+            profile_element.append(profile_header)
+            profile_element.append($myCanvas)
+    
+            return profile_element
+        }
+
+        $.datepicker.setDefaults( $.datepicker.regional[ "ru" ] );
+        $('#datepicker-user-from').datepicker({ dateFormat: 'dd.mm.yy' })
+        $('#datepicker-user-to').datepicker({ dateFormat: 'dd.mm.yy' })
+        $('#datepicker-overall').datepicker({ dateFormat: 'dd.mm.yy' })       
+        $( "#datepicker-user-from, #datepicker-user-to, #datepicker-overall").datepicker( "setDate", new Date() )
+    
+        selectTab(1)
+        let today = new Date()
+        $('#day').val(today.getDate())
+        $('#month').val(today.getMonth())
+        show()
+        
+    </script>
+</body>
+
+</html>
