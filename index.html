@@ -189,7 +189,7 @@
     
     
     <script>
-		var serverURL = "http://80.87.194.113:8080"
+		var serverURL = "http://localhost:8080"
 		
         var user_data = []
         var colors = {
@@ -651,7 +651,7 @@
         function getData(day, month) {
             console.log(`get data> day ${day}, month ${month}`)
             var xhr = new XMLHttpRequest()
-            xhr.open('GET', `http://80.87.194.113:8080/?day=${day}&month=${month}&c=${isCompensate()}`, false)
+            xhr.open('GET', `${serverURL}/?day=${day}&month=${month}&c=${isCompensate()}`, false)
             xhr.send()
             if (xhr.status != 200) {
                 alert( xhr.status + ': ' + xhr.statusText )
